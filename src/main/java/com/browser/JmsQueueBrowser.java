@@ -42,6 +42,10 @@ public class JmsQueueBrowser {
     producer_option.setRequired(false);
     options.addOption(producer_option);
 
+    Option selector_option = new Option("s", "selector", true, "Selector for searching the queue in the form \"size = 'big'\" (defaults to NULL)");
+    selector_option.setRequired(false);
+    options.addOption(selector_option);
+
     CommandLineParser parser = new DefaultParser();
     HelpFormatter formatter = new HelpFormatter();
     CommandLine cmd = null;
@@ -61,12 +65,15 @@ public class JmsQueueBrowser {
     String password = cmd.getOptionValue("password") == null ? "admin" : cmd.getOptionValue("password"); 
     Boolean create = cmd.getOptionValue("create") == null ? false : Boolean.valueOf(cmd.getOptionValue("create")); 
 
+    String selector = cmd.getOptionValue("selector");
+
     Connection connection = null;
 
     try {
       ConnectionFactory connectionFactory = new ActiveMQConnectionFactory(
           username, password, broker_url);
       connection = connectionFactory.createConnection();
+      connection.start();
       Session session = connection.createSession(false,
           Session.AUTO_ACKNOWLEDGE);
       Queue queue = session.createQueue(queue_name);
@@ -74,17 +81,21 @@ public class JmsQueueBrowser {
       if (create) {
         // Producer
         MessageProducer producer = session.createProducer(queue);
-        String payload = "Test";
-        Message msg = session.createTextMessage(payload);
-        System.out.println("Sending text '" + payload + "'");
-        producer.send(msg);
+        Message msg1 = session.createTextMessage("Big");
+        Message msg2 = session.createTextMessage("Small");
+        msg1.setStringProperty("size", "big");
+        msg2.setStringProperty("size", "small");
+        System.out.println("Sending 'Big' message");
+        producer.send(msg1);
+        System.out.println("Sending 'Small' message");
+        producer.send(msg2);
       }
 
       MessageConsumer consumer = session.createConsumer(queue);
-      connection.start();
 
       System.out.println("Browsing through the elements in queue: " + queue_name);
-      QueueBrowser browser = session.createBrowser(queue);
+    System.out.println("With selector: "+selector);
+      QueueBrowser browser = session.createBrowser(queue, selector);
       Enumeration e = browser.getEnumeration();
       while (e.hasMoreElements()) {
         TextMessage message = (TextMessage) e.nextElement();
